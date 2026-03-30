@@ -4,12 +4,13 @@ import os
 
 app = Flask(__name__)
 
-# --- إعدادات الأمان ---
-ADMIN_PASSWORD = "UISM_2026_ADMIN"  # يمكنك تغيير كلمة المرور من هنا
-UPLOAD_FOLDER = os.getcwd()
-ALLOWED_EXTENSIONS = {'xlsx'}
+# --- إعدادات النظام ---
+ADMIN_PASSWORD = "UISM_2026_ADMIN"  # كلمة مرور الإدارة
+# ضع رابط Google Sheets (xlsx) هنا إذا كنت تريد الاعتماد عليه كلياً
+SHEET_URL = "رابط_ملف_جوجل_شيت_هنا" 
+LOCAL_FILE = "salaries.xlsx"
 
-# واجهة الموقع المحدثة (HTML + CSS)
+# واجهة الموقع المتطورة
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -18,58 +19,69 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بوابة الرواتب | جامعة ابن سينا</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f4f8; margin: 0; padding: 20px; }
-        .container { max-width: 700px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .header { text-align: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 20px; margin-bottom: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f9; margin: 0; padding: 20px; color: #334155; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .header { text-align: center; border-bottom: 3px solid #0284c7; padding-bottom: 20px; margin-bottom: 30px; }
+        .header h2 { color: #0284c7; margin: 0; }
         .search-box { display: flex; flex-direction: column; gap: 15px; margin-bottom: 30px; align-items: center; }
-        input[type="text"], input[type="password"], input[type="file"] { padding: 12px; width: 80%; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; text-align: center; }
-        button { background: #0284c7; color: white; border: none; padding: 12px 30px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; width: 80%; }
-        .receipt { border: 2px solid #cbd5e1; padding: 25px; border-radius: 10px; margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; text-align: right; }
-        td { padding: 10px; border: 1px solid #cbd5e1; }
-        .bg-light { background-color: #f1f5f9; font-weight: bold; width: 35%; }
-        .error { color: #b91c1c; background: #fef2f2; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
-        .success { color: #059669; background: #ecfdf5; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
+        input { padding: 12px; width: 85%; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 16px; text-align: center; outline: none; transition: 0.3s; }
+        input:focus { border-color: #0284c7; }
+        .btn-search { background: #0284c7; color: white; border: none; padding: 12px; width: 85%; border-radius: 10px; cursor: pointer; font-size: 18px; font-weight: bold; }
+        .btn-search:hover { background: #0369a1; }
         
-        /* قسم الإدارة المخفي */
-        .admin-section { margin-top: 50px; border-top: 2px dashed #cbd5e1; padding-top: 20px; text-align: center; opacity: 0.6; }
-        .admin-section:hover { opacity: 1; }
+        .receipt { border: 2px solid #e2e8f0; padding: 20px; border-radius: 12px; background: #fff; position: relative; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 15px; }
+        .label { background: #f8fafc; font-weight: bold; width: 40%; color: #64748b; }
+        .value { color: #1e293b; font-weight: 500; }
+        .total-row { background: #f0fdf4 !important; }
+        .total-row td { color: #166534; font-weight: bold; font-size: 18px; border-bottom: none; }
+
+        .error { color: #b91c1c; background: #fef2f2; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; border: 1px solid #fecaca; }
+        .success { color: #15803d; background: #f0fdf4; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; border: 1px solid #bbf7d0; }
+
+        .admin-panel { margin-top: 60px; border-top: 2px dashed #cbd5e1; padding-top: 30px; background: #fdfdfd; border-radius: 0 0 15px 15px; }
+        .admin-title { font-size: 14px; color: #94a3b8; text-align: center; margin-bottom: 20px; font-weight: bold; }
         
-        @media print { .no-print { display: none !important; } }
+        @media print { .no-print { display: none !important; } .container { box-shadow: none; width: 100%; } }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header no-print">
-            <h2>🏛️ بوابة الرواتب الإلكترونية</h2>
-            <h4>جامعة ابن سينا للعلوم الطبية والصيدلانية</h4>
+            <h2>🏛️ جامعة ابن سينا للعلوم الطبية والصيدلانية</h2>
+            <p>نظام الاستعلام الإلكتروني عن الرواتب</p>
         </div>
         
         <form method="POST" action="/" class="search-box no-print">
             <input type="text" name="emp_id" placeholder="أدخل الرقم الوظيفي..." required>
-            <button type="submit">🔐 عرض كشف الراتب</button>
+            <button type="submit" class="btn-search">🔍 استعلام عن الراتب</button>
         </form>
 
         {% if msg %}<div class="{{ 'success' if 'تم' in msg else 'error' }}">{{ msg }}</div>{% endif %}
 
         {% if data %}
         <div class="receipt">
-            <h3 style="text-align: center;">🧾 وصل استلام راتب</h3>
+            <h3 style="text-align: center; color: #334155;">🧾 تفاصيل كشف الراتب</h3>
             <table>
-                <tr><td class="bg-light">الاسم</td><td class="val">{{ data.get('الاسم', '-') }}</td></tr>
-                <tr><td class="bg-light">الرقم الوظيفي</td><td class="val">{{ data.get('الرقم الوظيفي', '-') }}</td></tr>
-                <tr><td class="bg-light">الصافي للاستلام</td><td class="val" style="color: #059669; font-size: 20px; font-weight: bold;">{{ data.get('الراتب الصافي بعد الاستقطاعات', '-') }} د.ع</td></tr>
+                {% for key, value in data.items() %}
+                <tr class="{{ 'total-row' if 'صافي' in key or 'الاستلام' in key else '' }}">
+                    <td class="label">{{ key }}</td>
+                    <td class="value">{{ value }} {{ 'د.ع' if 'دينار' not in str(value) and any(x in key for x in ['راتب','مخصصات','استقطاع','صافي']) else '' }}</td>
+                </tr>
+                {% endfor %}
             </table>
-            <button onclick="window.print()" class="no-print" style="background: #334155;">🖨️ طباعة</button>
+            <br>
+            <button onclick="window.print()" class="btn-search no-print" style="background: #475569;">🖨️ طباعة كشف الراتب</button>
         </div>
         {% endif %}
 
-        <div class="admin-section no-print">
-            <p>⚙️ قسم إدارة البيانات (للمصرح لهم فقط)</p>
+        <div class="admin-panel no-print">
+            <div class="admin-title">⚙️ لوحة تحكم موظف المالية (تحديث البيانات)</div>
             <form method="POST" action="/upload" enctype="multipart/form-data" class="search-box">
-                <input type="password" name="password" placeholder="كلمة مرور الإدارة" required>
-                <input type="file" name="file" accept=".xlsx" required>
-                <button type="submit" style="background: #1e293b;">📤 تحديث قاعدة بيانات الرواتب</button>
+                <input type="password" name="password" placeholder="كلمة المرور الإدارية" required style="width: 70%;">
+                <input type="file" name="file" accept=".xlsx" required style="width: 70%; font-size: 12px;">
+                <button type="submit" style="background: #1e293b; width: 70%;" class="btn-search">📤 رفع وتحديث الملف</button>
             </form>
         </div>
     </div>
@@ -77,40 +89,44 @@ HTML_TEMPLATE = """
 </html>
 """
 
+def get_data():
+    # يحاول أولاً القراءة من الملف المحلي (الذي يرفعه الموظف)
+    if os.path.exists(LOCAL_FILE):
+        return pd.read_excel(LOCAL_FILE)
+    # إذا لم يوجد، يحاول القراءة من Google Sheets
+    try:
+        return pd.read_excel(SHEET_URL)
+    except:
+        return None
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     msg = None
     data = None
     if request.method == 'POST':
         emp_id = request.form.get('emp_id', '').strip()
-        if not os.path.exists("salaries.xlsx"):
-            msg = "⚠️ قاعدة البيانات غير متوفرة حالياً."
+        df = get_data()
+        if df is not None:
+            df['الرقم الوظيفي'] = df['الرقم الوظيفي'].astype(str).str.strip()
+            user_data = df[df['الرقم الوظيفي'] == emp_id]
+            if not user_data.empty:
+                data = user_data.iloc[0].to_dict()
+            else:
+                msg = "❌ الرقم الوظيفي غير صحيح أو غير مسجل."
         else:
-            try:
-                df = pd.read_excel("salaries.xlsx")
-                df['الرقم الوظيفي'] = df['الرقم الوظيفي'].astype(str).str.strip()
-                user_data = df[df['الرقم الوظيفي'] == emp_id]
-                if not user_data.empty:
-                    data = user_data.iloc[0].to_dict()
-                else:
-                    msg = "❌ الرقم الوظيفي غير موجود."
-            except:
-                msg = "⚠️ خطأ في قراءة ملف البيانات."
-    return render_template_string(HTML_TEMPLATE, msg=msg, data=data)
+            msg = "⚠️ قاعدة البيانات غير متوفرة، يرجى التواصل مع الإدارة."
+    return render_template_string(HTML_TEMPLATE, msg=msg, data=data, str=str, any=any)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
     password = request.form.get('password')
     file = request.files.get('file')
-    
     if password != ADMIN_PASSWORD:
-        return render_template_string(HTML_TEMPLATE, msg="❌ كلمة مرور خاطئة!")
-    
+        return render_template_string(HTML_TEMPLATE, msg="❌ كلمة مرور الإدارة خاطئة!")
     if file and file.filename.endswith('.xlsx'):
-        file.save(os.path.join(UPLOAD_FOLDER, "salaries.xlsx"))
-        return render_template_string(HTML_TEMPLATE, msg="✅ تم تحديث ملف الرواتب بنجاح!")
-    
-    return render_template_string(HTML_TEMPLATE, msg="⚠️ يرجى اختيار ملف Excel صحيح.")
+        file.save(LOCAL_FILE)
+        return render_template_string(HTML_TEMPLATE, msg="✅ تم تحديث قاعدة بيانات الرواتب بنجاح!")
+    return render_template_string(HTML_TEMPLATE, msg="⚠️ عذراً، يجب اختيار ملف Excel بصيغة .xlsx")
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
