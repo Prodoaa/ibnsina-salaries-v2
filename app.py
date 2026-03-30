@@ -1,195 +1,133 @@
-import streamlit as st
+from flask import Flask, request, render_template_string
 import pandas as pd
-import streamlit.components.v1 as components
 import os
 
-st.set_page_config(page_title="بوابة الرواتب | جامعة ابن سينا", page_icon="🏛️", layout="wide", initial_sidebar_state="expanded")
+app = Flask(__name__)
 
-st.markdown("""
-<style>
-    /* إخفاء القوائم وأدوات المطور */
-    #MainMenu {visibility: hidden !important;}
-    footer {visibility: hidden !important;}
-    header {visibility: hidden !important;}
-    [data-testid="stToolbar"] {visibility: hidden !important;}
-    [data-testid="stDecoration"] {visibility: hidden !important;}
-    [data-testid="stHeader"] {visibility: hidden !important;}
-    .stDeployButton {display: none !important;}
-
-    /* إعدادات الخلفية */
-    .stApp {
-        background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
-    /* تنسيق زر البحث */
-    [data-testid="stFormSubmitButton"] button {
-        background: linear-gradient(90deg, #0284c7 0%, #0369a1 100%);
-        color: white; border-radius: 8px; border: none; padding: 8px;
-        font-size: 16px; font-weight: bold; transition: all 0.3s ease;
-    }
-
-    /* إعدادات الطباعة النظيفة */
-    @media print {
-        .print-hide, [data-testid="stSidebar"], header, footer, [data-testid="stForm"], button, hr, .stDivider {
-            display: none !important;
-        }
+# واجهة الموقع (HTML + CSS)
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابة الرواتب | جامعة ابن سينا</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%); margin: 0; padding: 20px; }
+        .container { max-width: 700px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .header { text-align: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h2 { color: #0f172a; margin: 0; }
+        .header h4 { color: #475569; margin-top: 5px; font-weight: normal; }
         
-        html, body, .stApp, [data-testid="stAppViewContainer"], main, .block-container, [data-testid="stAppViewBlockContainer"] {
-            background: white !important;
-            background-color: #ffffff !important;
-            background-image: none !important;
-            color: black !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            width: 100% !important;
+        .search-box { display: flex; flex-direction: column; gap: 15px; margin-bottom: 30px; align-items: center; }
+        input[type="text"] { padding: 12px; width: 80%; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; text-align: center; }
+        button { background: linear-gradient(90deg, #0284c7 0%, #0369a1 100%); color: white; border: none; padding: 12px 30px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; width: 80%; }
+        button:hover { opacity: 0.9; }
+        
+        .receipt { border: 2px solid #cbd5e1; padding: 25px; border-radius: 10px; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 15px; text-align: right; }
+        td { padding: 10px; border: 1px solid #cbd5e1; }
+        .bg-light { background-color: #f1f5f9; font-weight: bold; width: 30%; color: #475569; }
+        .val { color: #1e293b; font-weight: bold; }
+        .error { color: #b91c1c; background: #fef2f2; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid #fca5a5; margin-bottom: 20px; font-weight: bold;}
+        
+        @media print {
+            body { background: white; padding: 0; }
+            .no-print { display: none !important; }
+            .container { box-shadow: none; border: none; padding: 0; max-width: 100%; }
+            .receipt { border: 2px solid #000; padding: 15px; }
         }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header no-print">
+            <h2>🏛️ بوابة الرواتب الإلكترونية</h2>
+            <h4>جامعة ابن سينا للعلوم الطبية والصيدلانية</h4>
+        </div>
+        
+        <form method="POST" class="search-box no-print">
+            <input type="text" name="emp_id" placeholder="أدخل الرقم الوظيفي هنا..." required value="{{ emp_id or '' }}">
+            <button type="submit">🔐 عرض كشف الراتب</button>
+        </form>
 
-        .receipt-container {
-            display: block !important;
-            position: absolute !important;
-            top: 20px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            width: 90% !important;
-            max-width: 600px !important;
-            border: 2px solid #000 !important;
-            box-shadow: none !important;
-            page-break-inside: avoid !important;
-        }
+        {% if error %}
+            <div class="error no-print">{{ error }}</div>
+        {% endif %}
 
-        @page { size: A4 portrait; margin: 10mm; }
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    }
-</style>
-""", unsafe_allow_html=True)
+        {% if data %}
+        <div class="receipt">
+            <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #0f172a; padding-bottom: 15px;">
+                <h3 style="margin: 0; font-size: 22px;">🧾 وصل استلام راتب</h3>
+                <div style="color: #64748b; margin-top: 5px;">كشف مفردات الراتب الشهري</div>
+            </div>
+            
+            <table>
+                <tr><td class="bg-light">الاسم</td><td colspan="3" class="val">{{ data.get('الاسم', '-') }}</td></tr>
+                <tr>
+                    <td class="bg-light">الرقم الوظيفي</td><td class="val">{{ data.get('الرقم الوظيفي', '-') }}</td>
+                    <td class="bg-light">اللقب العلمي</td><td class="val">{{ data.get('اللقب العلمي', '-') }}</td>
+                </tr>
+                <tr><td class="bg-light">المنصب</td><td colspan="3" class="val">{{ data.get('المنصب', '-') }}</td></tr>
+                <tr>
+                    <td class="bg-light">الدرجة الوظيفية</td><td class="val">{{ data.get('الدرجة الوظيفية', '-') }}</td>
+                    <td class="bg-light">المرحلة</td><td class="val">{{ data.get('المرحلة', '-') }}</td>
+                </tr>
+            </table>
+            
+            <h4 style="color: #334155; margin-bottom: 10px;">📊 تفاصيل المستحقات والاستقطاعات:</h4>
+            <table>
+                <tr><td class="bg-light">الراتب الاسمي</td><td class="val">{{ data.get('الراتب الاسمي', '-') }}</td></tr>
+                <tr><td class="bg-light">الخدمة الجامعية</td><td class="val">{{ data.get('الخدمة الجامعية', '-') }}</td></tr>
+                <tr><td class="bg-light">النقل</td><td class="val">{{ data.get('النقل', '-') }}</td></tr>
+                <tr><td class="bg-light">الزوجية</td><td class="val">{{ data.get('الزوجية', '-') }}</td></tr>
+                <tr style="background-color: #eff6ff;"><td class="bg-light" style="color: #0369a1;">الراتب الكامل</td><td class="val" style="color: #0369a1;">{{ data.get('الراتب الكامل', '-') }}</td></tr>
+                <tr style="background-color: #fef2f2;"><td class="bg-light" style="color: #b91c1c;">التقاعد (استقطاع)</td><td class="val" style="color: #ef4444;">{{ data.get('التقاعد', '-') }}</td></tr>
+                <tr style="background-color: #fef2f2;"><td class="bg-light" style="color: #b91c1c;">الضريبة (استقطاع)</td><td class="val" style="color: #ef4444;">{{ data.get('الضريبة', '-') }}</td></tr>
+                <tr style="background-color: #ecfdf5;"><td class="bg-light" style="color: #059669; font-size: 16px;">الصافي للاستلام (د.ع)</td><td class="val" style="color: #059669; font-size: 20px;">{{ data.get('الراتب الصافي بعد الاستقطاعات', '-') }}</td></tr>
+            </table>
+        </div>
+        
+        <div class="no-print" style="text-align: center; margin-top: 25px;">
+            <button onclick="window.print()" style="background: #0f172a; width: auto; padding: 10px 30px;">🖨️ طباعة وصل الراتب</button>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+"""
 
-with st.sidebar:
-    st.markdown("<h3 style='text-align: center; direction: rtl;'>⚙️ الإدارة</h3>", unsafe_allow_html=True)
-    password = st.text_input("رمز المرور:", type="password", key="admin_pass")
-    if password == "1234":
-        st.success("✅ تم الدخول")
-        uploaded_file = st.file_uploader("📂 رفع ملف Excel:", type=["xlsx", "xls"])
-        if uploaded_file is not None:
-            with open("salaries.xlsx", "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            st.success("✨ تم التحديث بنجاح!")
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    error = None
+    data = None
+    emp_id = ""
 
-st.markdown("""
-<div class="print-hide" style='background: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; border: 1px solid #cbd5e1; margin-top: 30px;'>
-    <h2 style='color: #0f172a; margin: 0;'>🏛️ بوابة الرواتب الإلكترونية</h2>
-    <h4 style='color: #475569; margin-top: 5px; font-weight: normal;'>جامعة ابن سينا للعلوم الطبية والصيدلانية</h4>
-</div>
-""", unsafe_allow_html=True)
-
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    with st.form(key='search_form'):
-        emp_id = st.text_input("الرقم الوظيفي", placeholder="أدخل الرقم الوظيفي هنا...", label_visibility="collapsed")
-        search_button = st.form_submit_button("🔐 عرض كشف الراتب", use_container_width=True)
-
-st.write("---")
-
-if search_button:
-    if not emp_id.strip():
-        st.warning("⚠️ يرجى كتابة الرقم الوظيفي أولاً.")
-    elif not os.path.exists("salaries.xlsx"):
-        st.error("❌ ملف قاعدة البيانات غير موجود. الرجاء رفع الملف من لوحة الإدارة.")
-    else:
-        try:
-            df = pd.read_excel("salaries.xlsx")
-            if 'الرقم الوظيفي' not in df.columns:
-                st.error("❌ لا يوجد عمود باسم 'الرقم الوظيفي' في ملف الإكسيل.")
-            else:
+    if request.method == 'POST':
+        emp_id = request.form.get('emp_id', '').strip()
+        
+        # التأكد من وجود ملف الإكسيل
+        if not os.path.exists("salaries.xlsx"):
+            error = "⚠️ ملف قاعدة البيانات (salaries.xlsx) غير موجود."
+        else:
+            try:
+                # قراءة ملف الإكسيل
+                df = pd.read_excel("salaries.xlsx")
                 df['الرقم الوظيفي'] = df['الرقم الوظيفي'].astype(str).str.strip()
-                search_query = str(emp_id).strip()
-                user_data = df[df['الرقم الوظيفي'] == search_query]
+                
+                # البحث عن الموظف
+                user_data = df[df['الرقم الوظيفي'] == emp_id]
                 
                 if not user_data.empty:
-                    row = user_data.iloc[0]
-                    
-                    html_unified_card = f"""
-<div class="receipt-container" style="direction: rtl; background: white; border-radius: 10px; padding: 25px; border: 2px solid #cbd5e1; max-width: 550px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-<div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px;">
-<h3 style="color: #0f172a; margin: 0; font-size: 22px;">🧾 وصل استلام راتب</h3>
-<div style="color: #64748b; font-size: 14px; margin-top: 5px;">كشف مفردات الراتب الشهري</div>
-</div>
-<table style="width: 100%; border-collapse: collapse; font-size: 14px; text-align: right; margin-bottom: 25px;">
-<tbody>
-<tr>
-<td style="padding: 8px; font-weight: bold; background-color: #f1f5f9; border: 1px solid #cbd5e1; width: 25%; color: #475569;">الاسم</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1;" colspan="3">{row.get('الاسم', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 8px; font-weight: bold; background-color: #f1f5f9; border: 1px solid #cbd5e1; width: 25%; color: #475569;">الرقم الوظيفي</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1; width: 25%;">{row.get('الرقم الوظيفي', '-')}</td>
-<td style="padding: 8px; font-weight: bold; background-color: #f1f5f9; border: 1px solid #cbd5e1; width: 25%; color: #475569;">اللقب العلمي</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1; width: 25%;">{row.get('اللقب العلمي', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 8px; font-weight: bold; background-color: #f1f5f9; border: 1px solid #cbd5e1; color: #475569;">المنصب</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1;" colspan="3">{row.get('المنصب', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 8px; font-weight: bold; background-color: #f1f5f9; border: 1px solid #cbd5e1; width: 25%; color: #475569;">الدرجة الوظيفية</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1; width: 25%;">{row.get('الدرجة الوظيفية', '-')}</td>
-<td style="padding: 8px; font-weight: bold; background-color: #f1f5f9; border: 1px solid #cbd5e1; width: 25%; color: #475569;">المرحلة</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1; width: 25%;">{row.get('المرحلة', '-')}</td>
-</tr>
-</tbody>
-</table>
-<div style="font-weight: bold; color: #334155; margin-bottom: 10px; font-size: 15px;">📊 تفاصيل المستحقات والاستقطاعات:</div>
-<table style="width: 100%; border-collapse: collapse; font-size: 14px; text-align: right;">
-<tbody>
-<tr>
-<td style="padding: 8px; font-weight: bold; color: #475569; width: 45%; border: 1px solid #cbd5e1; background-color: #f8fafc;">الراتب الاسمي</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1;">{row.get('الراتب الاسمي', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 8px; font-weight: bold; color: #475569; border: 1px solid #cbd5e1; background-color: #f8fafc;">الخدمة الجامعية</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1;">{row.get('الخدمة الجامعية', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 8px; font-weight: bold; color: #475569; border: 1px solid #cbd5e1; background-color: #f8fafc;">النقل</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1;">{row.get('النقل', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 8px; font-weight: bold; color: #475569; border: 1px solid #cbd5e1; background-color: #f8fafc;">الزوجية</td>
-<td style="padding: 8px; font-weight: bold; color: #1e293b; border: 1px solid #cbd5e1;">{row.get('الزوجية', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 8px; font-weight: bold; color: #0369a1; border: 1px solid #93c5fd; background-color: #eff6ff;">الراتب الكامل</td>
-<td style="padding: 8px; font-weight: bold; color: #0369a1; border: 1px solid #93c5fd; background-color: #eff6ff;">{row.get('الراتب الكامل', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 8px; font-weight: bold; color: #b91c1c; border: 1px solid #fca5a5; background-color: #fef2f2;">التقاعد (استقطاع)</td>
-<td style="padding: 8px; font-weight: bold; color: #ef4444; border: 1px solid #fca5a5; background-color: #fef2f2;">{row.get('التقاعد', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 8px; font-weight: bold; color: #b91c1c; border: 1px solid #fca5a5; background-color: #fef2f2;">الضريبة (استقطاع)</td>
-<td style="padding: 8px; font-weight: bold; color: #ef4444; border: 1px solid #fca5a5; background-color: #fef2f2;">{row.get('الضريبة', '-')}</td>
-</tr>
-<tr>
-<td style="padding: 12px 8px; font-weight: 900; color: #059669; border: 2px solid #10b981; background-color: #ecfdf5; font-size: 16px;">الصافي للاستلام (د.ع)</td>
-<td style="padding: 12px 8px; font-weight: 900; color: #059669; border: 2px solid #10b981; background-color: #ecfdf5; font-size: 20px;">{row.get('الراتب الصافي بعد الاستقطاعات', '-')}</td>
-</tr>
-</tbody>
-</table>
-</div>
-"""
-                    st.markdown(html_unified_card, unsafe_allow_html=True)
-
-                    components.html(
-                        """
-                        <div class="print-hide" style="text-align: center; margin-top: 25px;">
-                            <button onclick="window.parent.print()" style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%); color: white; border-radius: 6px; border: none; padding: 10px 30px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);">
-                                🖨️ طباعة وصل الراتب
-                            </button>
-                        </div>
-                        """, height=80
-                    )
+                    data = user_data.iloc[0].to_dict()
                 else:
-                    st.error("❌ لم يتم العثور على موظف بهذا الرقم الوظيفي.")
-                    
-        except Exception as e:
-            st.error("⚠️ حدث خطأ أثناء معالجة البيانات.")
+                    error = "❌ لم يتم العثور على موظف بهذا الرقم الوظيفي."
+            except Exception as e:
+                error = "⚠️ حدث خطأ أثناء معالجة ملف الإكسيل."
+
+    return render_template_string(HTML_TEMPLATE, error=error, data=data, emp_id=emp_id)
+
+if __name__ == '__main__':
+    # تشغيل السيرفر
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
