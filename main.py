@@ -16,76 +16,83 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بوابة الرواتب | جامعة ابن سينا</title>
     <style>
-        :root { --primary: #1e40af; --secondary: #64748b; --accent: #10b981; --bg: #f1f5f9; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #1e293b; }
-        .container { max-width: 750px; margin: 0 auto; }
+        :root { --primary: #1e3a8a; --accent: #10b981; --border: #e2e8f0; --bg: #f8fafc; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+
+        /* كارت البحث */
+        .card-search { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; margin-bottom: 25px; }
+        input[type="text"] { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--border); font-size: 16px; text-align: center; box-sizing: border-box; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 15px 30px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 15px; font-size: 17px; }
+
+        /* تصميم المخطط (Timeline) */
+        .salary-chart-card { background: white; border-radius: 24px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.08); position: relative; }
+        .employee-name { text-align: center; color: var(--primary); font-size: 24px; font-weight: 800; margin-bottom: 30px; border-bottom: 2px solid var(--bg); padding-bottom: 15px; }
+
+        .timeline { position: relative; margin-right: 20px; border-right: 3px solid #e2e8f0; padding: 10px 0; }
+        .item { position: relative; margin-bottom: 25px; padding-right: 35px; }
         
-        .search-card { background: white; border-radius: 24px; padding: 40px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-bottom: 30px; }
-        .header h2 { color: var(--primary); margin: 0; font-size: 26px; font-weight: 800; }
-        
-        input[type="text"], input[type="password"] { width: 100%; max-width: 400px; padding: 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 16px; text-align: center; margin-bottom: 10px; box-sizing: border-box; }
-        .btn-search { background: var(--primary); color: white; padding: 16px; border-radius: 12px; border: none; font-size: 18px; font-weight: 700; cursor: pointer; width: 100%; max-width: 400px; transition: 0.3s; }
-        .btn-search:hover { background: #1e3a8a; transform: translateY(-2px); }
+        /* الدوائر في المخطط */
+        .item::before { 
+            content: ''; position: absolute; right: -9px; top: 5px; 
+            width: 15px; height: 15px; background: white; 
+            border: 3px solid var(--primary); border-radius: 50%; z-index: 2; 
+        }
 
-        /* الجدول المذهل */
-        .salary-card { background: white; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); animation: fadeIn 0.6s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .item-content { display: flex; justify-content: space-between; align-items: center; background: #fdfdfd; padding: 12px 18px; border-radius: 15px; border: 1px solid #f1f5f9; }
+        .item-label { color: #64748b; font-size: 15px; font-weight: 600; }
+        .item-value { color: #1e293b; font-weight: 700; font-family: 'Courier New', monospace; }
 
-        .table-header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 25px; text-align: center; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 18px 25px; border-bottom: 1px solid #f1f5f9; font-size: 16px; }
-        .label { color: #64748b; font-weight: 600; width: 45%; }
-        .value { color: #0f172a; font-weight: 700; text-align: left; }
+        /* تمييز الصافي */
+        .net-item::before { border-color: var(--accent); background: var(--accent); }
+        .net-item .item-content { background: #ecfdf5; border: 1px solid #bbf7d0; padding: 20px 18px; }
+        .net-item .item-label { color: #065f46; font-size: 18px; }
+        .net-item .item-value { color: #047857; font-size: 22px; }
 
-        /* تمييز صافي الراتب */
-        .highlight { background: #f0fdf4 !important; }
-        .highlight td { color: #15803d !important; font-size: 20px !important; font-weight: 900; border-bottom: none; }
+        .admin-box { margin-top: 50px; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 20px; }
+        .admin-box input { font-size: 12px; margin-bottom: 5px; }
 
-        .admin-footer { margin-top: 50px; text-align: center; padding: 20px; border-top: 1px dashed #cbd5e1; opacity: 0.8; }
-        @media print { .no-print { display: none !important; } body { background: white; } .salary-card { box-shadow: none; border: 1px solid #eee; } }
+        @media print { .no-print { display: none !important; } .salary-chart-card { box-shadow: none; border: 1px solid #eee; } }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="search-card no-print">
-            <div class="header">
-                <h2>🏛️ جامعة ابن سينا</h2>
-                <p>بوابة الاستعلام الإلكتروني عن الرواتب</p>
-            </div>
+        
+        <div class="card-search no-print">
+            <h2 style="margin:0 0 10px 0; color:var(--primary);">🏛️ جامعة ابن سينا</h2>
+            <p style="margin:0 0 20px 0; color:#64748b; font-size:14px;">نظام عرض الرواتب المخطط</p>
             <form method="POST">
                 <input type="text" name="emp_id" placeholder="أدخل الرقم الوظيفي..." required>
-                <button type="submit" class="btn-search">عرض الكشف الآن ➜</button>
+                <button type="submit" class="btn-main">استعلام عن التفاصيل</button>
             </form>
         </div>
 
-        {% if msg %}<div style="text-align:center; color:#dc2626; margin-bottom:20px; font-weight:bold;">{{ msg }}</div>{% endif %}
+        {% if msg %}<div style="text-align:center; color:#ef4444; margin-bottom:20px;">{{ msg }}</div>{% endif %}
 
         {% if data %}
-        <div class="salary-card">
-            <div class="table-header">
-                <div style="font-size: 14px; opacity: 0.9;">كشف الراتب الرسمي للموظف</div>
-                <div style="font-size: 22px; font-weight: bold; margin-top: 5px;">{{ data.get('الاسم', 'الموظف') }}</div>
-            </div>
-            <table>
+        <div class="salary-chart-card">
+            <div class="employee-name">{{ data.get('الاسم', 'موظف الجامعة') }}</div>
+            
+            <div class="timeline">
                 {% for key, value in data.items() if key != 'الاسم' %}
-                <tr class="{{ 'highlight' if 'صافي' in key or 'استلام' in key else '' }}">
-                    <td class="label">
-                        {% if 'صافي' in key %}💰{% elif 'استقطاع' in key %}📉{% else %}•{% endif %} {{ key }}
-                    </td>
-                    <td class="value">{{ value }}</td>
-                </tr>
+                <div class="item {{ 'net-item' if 'صافي' in key or 'استلام' in key else '' }}">
+                    <div class="item-content">
+                        <span class="item-label">{{ key }}</span>
+                        <span class="item-value">{{ value }}</span>
+                    </div>
+                </div>
                 {% endfor %}
-            </table>
+            </div>
+            
+            <button onclick="window.print()" class="btn-main no-print" style="background:#334155;">🖨️ طباعة المخطط الرسمي</button>
         </div>
-        <button onclick="window.print()" class="btn-search no-print" style="background:#334155; margin-top:20px; max-width:100%;">🖨️ طباعة الكشف</button>
         {% endif %}
 
-        <div class="admin-footer no-print">
-            <p style="font-size:12px;">⚙️ قسم الإدارة</p>
+        <div class="admin-box no-print">
             <form method="POST" action="/upload" enctype="multipart/form-data">
-                <input type="password" name="password" placeholder="كلمة المرور" required style="max-width:200px; padding:8px;">
-                <input type="file" name="file" accept=".xlsx" required style="font-size:11px;">
-                <button type="submit" style="background:#475569; color:white; border:none; padding:8px 15px; border-radius:8px; cursor:pointer;">تحديث</button>
+                <input type="password" name="password" placeholder="كلمة المرور" required><br>
+                <input type="file" name="file" accept=".xlsx" required><br>
+                <button type="submit" style="background:#475569; color:white; border:none; padding:8px 15px; border-radius:8px; cursor:pointer; margin-top:5px;">تحديث القاعدة</button>
             </form>
         </div>
     </div>
@@ -101,15 +108,16 @@ def index():
         if os.path.exists(LOCAL_FILE):
             try:
                 df = pd.read_excel(LOCAL_FILE)
+                # تنظيف أسماء الأعمدة من أي مسافات مخفية
                 df.columns = [str(c).strip() for c in df.columns]
                 df['الرقم الوظيفي'] = df['الرقم الوظيفي'].astype(str).str.strip()
                 res = df[df['الرقم الوظيفي'] == emp_id]
                 if not res.empty:
                     data = res.iloc[0].to_dict()
                 else:
-                    msg = "❌ الرقم الوظيفي غير مسجل."
-            except Exception as e:
-                msg = "⚠️ حدث خطأ في معالجة الملف."
+                    msg = "❌ لم يتم العثور على هذا الرقم الوظيفي."
+            except:
+                msg = "⚠️ يوجد مشكلة في ملف الإكسل المرفوع."
         else:
             msg = "⚠️ لم يتم رفع ملف الرواتب بعد."
     return render_template_string(HTML_TEMPLATE, msg=msg, data=data)
@@ -120,8 +128,8 @@ def upload_file():
         file = request.files.get('file')
         if file and file.filename.endswith('.xlsx'):
             file.save(LOCAL_FILE)
-            return render_template_string(HTML_TEMPLATE, msg="✅ تم التحديث بنجاح!")
-    return render_template_string(HTML_TEMPLATE, msg="❌ فشل التحديث!")
+            return render_template_string(HTML_TEMPLATE, msg="✅ تم تحديث البيانات بنجاح!")
+    return render_template_string(HTML_TEMPLATE, msg="❌ فشل التحديث: كلمة مرور خاطئة أو ملف غير صحيح.")
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
