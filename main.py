@@ -5,7 +5,7 @@ import os
 app = Flask(__name__)
 
 # --- الإعدادات الأمنية والملفات ---
-ADMIN_PASSWORD = "UISM_2026_ADMIN" 
+ADMIN_PASSWORD = "admin" 
 LOCAL_FILE = "salaries.xlsx"
 
 HTML_TEMPLATE = """
